@@ -10,7 +10,7 @@ all: tags $(TARGET)
 
 # link it all together
 $(TARGET): png2gba.c
-	$(CC) $(FLAGS) -o $(TARGET) png2gba.c
+	$(CC) $(FLAGS) -o $(TARGET) png2gba.c -lpng
  
 # tidy up
 clean:
