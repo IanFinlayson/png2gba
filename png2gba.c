@@ -153,7 +153,7 @@ struct Image* read_png(FILE* in) {
     /* check format */
     if (png_get_color_type(png_reader, png_info) == PNG_COLOR_TYPE_RGB) {
         image->channels = 3;
-    } else if (png_get_color_type(png_reader, png_info) == PNG_COLOR_TYPE_RGBA) {
+    } else if (png_get_color_type(png_reader,png_info)==PNG_COLOR_TYPE_RGBA) {
         fprintf(stderr, "Warning: PNG alpha channel is ignored!\n");
         image->channels = 4;
     } else {
@@ -344,7 +344,4 @@ int main(int argc, char** argv) {
 
     return 0;
 }
-
-
-
 
