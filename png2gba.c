@@ -76,7 +76,7 @@ struct argp info = {options, parse_opt, args_doc, doc, NULL, NULL, NULL};
 
 /* a PNG image we load */
 struct Image {
-    int w, h;
+    int w, h, channels;
     png_byte color_type;
     png_byte bit_depth;
     png_bytep* rows;
@@ -134,6 +134,16 @@ struct Image* read_png(FILE* in) {
     }
     png_read_image(png_reader, image->rows);
 
+    /* check format */
+    if (png_get_color_type(png_reader, png_info) == PNG_COLOR_TYPE_RGB) {
+        image->channels = 3;
+    } else if (png_get_color_type(png_reader, png_info) == PNG_COLOR_TYPE_RGBA) {
+        image->channels = 4;
+    } else {
+        fprintf(stderr, "PNG file is not in the RGB or RGBA format!\n");
+        exit(-1);
+    }
+
     /* close the input file and return */
     fclose(in);
     return image;
@@ -144,15 +154,24 @@ void png2gba(FILE* in, FILE* out) {
     /* load the image */
     struct Image* image = read_png(in);
 
+    /* loop through the pixel data */
+    int r, c;
+    for (r = 0; r < image->h; r++) {
+        png_byte* row = image->rows[r];
 
+        for (c = 0; c < image->w; c++) {
+            png_byte* ptr = &(row[r * image->channels]);
 
-
-
-
-
-
-
+            if (image->channels == 4)
+                printf("Pixel at position [ %d - %d ] has RGBA values: %d - %d - %d - %d\n",
+                    r, c, ptr[0], ptr[1], ptr[2], ptr[3]);
+            else
+                printf("Pixel at position [ %d - %d ] has RGB values: %d - %d - %d\n",
+                    r, c, ptr[0], ptr[1], ptr[2]);
+        }
+    }
 }
+
 
 int main(int argc, char** argv) {
     /* set up the arguments structure */
