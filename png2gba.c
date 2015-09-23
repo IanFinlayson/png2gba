@@ -29,7 +29,6 @@ const char args_doc[] = "FILE";
 /* the command line options for the compiler */
 const struct argp_option options[] = {
     {"palette", 'p', NULL, 0, "Use a palette in the produced image", 0},
-    {"output", 'o', "file", 0, "Specify output file", 0},
     {NULL, 0, NULL, 0, NULL, 0}
 };
 
@@ -228,15 +227,17 @@ void png2gba(FILE* in, FILE* out, char* name, int palette) {
 
         for (c = 0; c < image->w; c++) {
             /* read colors */
-            png_byte* ptr = &(row[r * image->channels]);
+            png_byte* ptr = &(row[c * image->channels]);
             red = ptr[0];
             green = ptr[1];
             blue = ptr[2];
 
             /* convert to 16-bit color */
-            unsigned short color = blue << 10;
-            color += green << 5;
-            color += red;
+            unsigned short color = (blue >> 3) << 10;
+            color += (green >> 3) << 5;
+            color += (red >> 3);
+
+            printf("0x%04X\n", color);
 
             /* print leading space if first of line */
             if (colors_this_line == 0) {
@@ -245,11 +246,11 @@ void png2gba(FILE* in, FILE* out, char* name, int palette) {
 
             /* print color directly, or palette index */
             if (!palette) { 
-                fprintf(out, "0x%04x", color);
+                fprintf(out, "0x%04X", color);
             } else {
                 unsigned char index = insert_palette(color, color_palette,
                         &palette_size);
-                fprintf(out, "0x%02x", index);
+                fprintf(out, "0x%02X", index);
             }
 
             /* print comma and space for all but last pixel */
@@ -320,16 +321,10 @@ int main(int argc, char** argv) {
 
     /* set output file if name given */
     FILE* output;
-    if (args.output_file_name != NULL) {
-        /* if a name is specified, use that */
-        output = fopen(args.output_file_name, "w");
-    }
-    else {
-        /* if none specified use input name with .h */
-        char output_name[sizeof(char) * (strlen(name) + 3)];
-        sprintf(output_name, "%s.h", name);
-        output = fopen(output_name, "w");
-    }
+    /* if none specified use input name with .h */
+    char output_name[sizeof(char) * (strlen(name) + 3)];
+    sprintf(output_name, "%s.h", name);
+    output = fopen(output_name, "w");
 
     /* set input file to what was passed in */
     FILE* input = fopen(args.input_file_name, "rb");
