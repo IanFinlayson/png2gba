@@ -237,8 +237,6 @@ void png2gba(FILE* in, FILE* out, char* name, int palette) {
             color += (green >> 3) << 5;
             color += (red >> 3);
 
-            printf("0x%04X\n", color);
-
             /* print leading space if first of line */
             if (colors_this_line == 0) {
                 fprintf(out, "    ");
