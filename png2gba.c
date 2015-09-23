@@ -28,6 +28,7 @@ const char args_doc[] = "FILE";
 
 /* the command line options for the compiler */
 const struct argp_option options[] = {
+    {"output", 'o', "file", 0, "Specify output file", 0}, 
     {"palette", 'p', NULL, 0, "Use a palette in the produced image", 0},
     {NULL, 0, NULL, 0, NULL, 0}
 };
