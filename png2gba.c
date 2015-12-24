@@ -14,6 +14,9 @@
 /* the GBA palette size is always 256 colors */
 #define PALETTE_SIZE 256
 
+/* the GBA always uses 8x8 tiles */
+#define TILE_SIZE 8
+
 /* the max 8-bit or 16-bit values on a row
  * this only affects aesthetics by keeping the files from exceeding a width
  * of 80 characters */
@@ -30,12 +33,14 @@ const char args_doc[] = "FILE";
 const struct argp_option options[] = {
     {"output", 'o', "file", 0, "Specify output file", 0}, 
     {"palette", 'p', NULL, 0, "Use a palette in the produced image", 0},
+    {"tileize", 't', NULL, 0, "Output the image as consecutive 8x8 tiles", 0},
     {NULL, 0, NULL, 0, NULL, 0}
 };
 
 /* used by main to communicate with parse_opt */
 struct arguments {
     int palette;
+    int tileize;
     char* output_file_name;
     char* input_file_name;
 };
@@ -52,6 +57,10 @@ error_t parse_opt (int key, char* arg, struct argp_state* state) {
             /* set the palette option */
             arguments->palette = 1;
             break;
+
+        case 't':
+            /* set the tileize option */
+            arguments->tileize = 1;
 
         case 'o':
             /* the output file name is set */
@@ -196,8 +205,87 @@ unsigned char insert_palette(unsigned short color,
     return (*palette_size) - 1;
 }
 
+/* returns the next pixel from the image, based on whether we
+ * are tile-izing or not, returns NULL when we have done them all */
+png_byte* next_byte(struct Image* image, int tileize) {
+    /* keeps track of where we are in the "global" image */
+    static int r = 0;
+    static int c = 0;
+
+    /* keeps track of where we are relative to one tile (0-7) */
+    static int tr = 0;
+    static int tc = 0;
+
+    /* if we have gone through it all */
+    if (r == image->h) {
+        return NULL;
+    }
+
+    /* get the pixel next */
+    png_byte* row = image->rows[r];
+    png_byte* ptr = &(row[c * image->channels]);
+
+    /* increment things based on if we are tileizing or not */
+    if (!tileize) {
+        /* just go sequentially, wrapping to the next row at the end of a column */
+        c++;
+        if (c >= image->w) {
+            r++;
+            c = 0;
+        }
+    } else {
+        /* increment the column */
+        c++;
+        tc++;
+
+        /* if we hit the end of a tile row */
+        if (tc >= 8) {
+            /* go to the next one */
+            r++;
+            tr++;
+            c -= 8;
+            tc = 0;
+
+            /* if we hit the end of the tile altogether */
+            if (tr >= 8) {
+                r -= 8;
+                tr = 0;
+                c += 8;
+            }
+
+            /* if we are now at the end of the actual row, go to next one */
+            if (c >= image->w) {
+                tc = 0;
+                tr = 0;
+                c = 0;
+                r += 8;
+            }
+        }
+
+        /* 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 x
+         * 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2
+         * 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2
+         * 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2
+         * 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2
+         * 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2
+         * 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2
+         * 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2
+         * 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5
+         * 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5
+         * 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5
+         * 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5
+         * 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5
+         * 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5
+         * 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5
+         * 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5 */
+    }
+
+    /* and return the pixel we found previously */
+    return ptr;
+}
+
 /* perform the actual conversion from png to gba formats */
-void png2gba(FILE* in, FILE* out, char* name, int palette) {
+void png2gba(FILE* in, FILE* out, char* name, int palette, int tileize) {
     /* load the image */
     struct Image* image = read_png(in);
 
@@ -220,51 +308,43 @@ void png2gba(FILE* in, FILE* out, char* name, int palette) {
     memset(color_palette, 0, PALETTE_SIZE * sizeof(unsigned short));
 
     /* loop through the pixel data */
-    int r, c;
     unsigned char red, green, blue;
     int colors_this_line = 0;
-    for (r = 0; r < image->h; r++) {
-        png_byte* row = image->rows[r];
+    png_byte* ptr;
 
-        for (c = 0; c < image->w; c++) {
-            /* read colors */
-            png_byte* ptr = &(row[c * image->channels]);
-            red = ptr[0];
-            green = ptr[1];
-            blue = ptr[2];
+    while ((ptr = next_byte(image, tileize))) {
+        red = ptr[0];
+        green = ptr[1];
+        blue = ptr[2];
 
-            /* convert to 16-bit color */
-            unsigned short color = (blue >> 3) << 10;
-            color += (green >> 3) << 5;
-            color += (red >> 3);
+        /* convert to 16-bit color */
+        unsigned short color = (blue >> 3) << 10;
+        color += (green >> 3) << 5;
+        color += (red >> 3);
 
-            /* print leading space if first of line */
-            if (colors_this_line == 0) {
-                fprintf(out, "    ");
-            }
-
-            /* print color directly, or palette index */
-            if (!palette) { 
-                fprintf(out, "0x%04X", color);
-            } else {
-                unsigned char index = insert_palette(color, color_palette,
-                        &palette_size);
-                fprintf(out, "0x%02X", index);
-            }
-
-            /* print comma and space for all but last pixel */
-            if ((r < (image->h - 1)) || (c < (image->w - 1))) {
-                fprintf(out, ", ");
-            }
-
-            /* increment colors on line unless too many */
-            colors_this_line++;
-            if ((palette && colors_this_line >= MAX_ROW8) ||
-                (!palette && colors_this_line >= MAX_ROW16)) {
-                fprintf(out, "\n");
-                colors_this_line = 0;
-            } 
+        /* print leading space if first of line */
+        if (colors_this_line == 0) {
+            fprintf(out, "    ");
         }
+
+        /* print color directly, or palette index */
+        if (!palette) { 
+            fprintf(out, "0x%04X", color);
+        } else {
+            unsigned char index = insert_palette(color, color_palette,
+                    &palette_size);
+            fprintf(out, "0x%02X", index);
+        }
+
+        fprintf(out, ", ");
+
+        /* increment colors on line unless too many */
+        colors_this_line++;
+        if ((palette && colors_this_line >= MAX_ROW8) ||
+                (!palette && colors_this_line >= MAX_ROW16)) {
+            fprintf(out, "\n");
+            colors_this_line = 0;
+        } 
     }
 
     /* write postamble stuff */
@@ -305,6 +385,7 @@ int main(int argc, char** argv) {
     args.output_file_name = NULL;
     args.input_file_name = NULL;
     args.palette = 0;
+    args.tileize = 0;
 
     /* parse command line */
     argp_parse(&info, argc, argv, 0, 0, &args);
@@ -334,7 +415,7 @@ int main(int argc, char** argv) {
     }
 
     /* do the conversion on these files */
-    png2gba(input, output, name, args.palette);
+    png2gba(input, output, name, args.palette, args.tileize);
 
     return 0;
 }
