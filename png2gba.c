@@ -295,8 +295,6 @@ unsigned short hex24_to_15(char* hex24) {
     int g = strtol(gs, NULL, 16);
     int b = strtol(bs, NULL, 16);
 
-    printf("r = %d, g = %d, b = %d\n", r, g, b);
-
     /* build the full 15 bit short */
     unsigned short color = (b >> 3) << 10;
     color += (g >> 3) << 5;
