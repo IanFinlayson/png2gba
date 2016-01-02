@@ -32,6 +32,7 @@ const char args_doc[] = "FILE";
 /* the command line options for the compiler */
 const struct argp_option options[] = {
     {"output", 'o', "file", 0, "Specify output file", 0}, 
+    {"colorkey", 'c', "color", 0, "Specify the transparent color (#rrggbb)", 0}, 
     {"palette", 'p', NULL, 0, "Use a palette in the produced image", 0},
     {"tileize", 't', NULL, 0, "Output the image as consecutive 8x8 tiles", 0},
     {NULL, 0, NULL, 0, NULL, 0}
@@ -41,6 +42,7 @@ const struct argp_option options[] = {
 struct arguments {
     int palette;
     int tileize;
+    char* colorkey;
     char* output_file_name;
     char* input_file_name;
 };
@@ -65,6 +67,11 @@ error_t parse_opt (int key, char* arg, struct argp_state* state) {
         case 'o':
             /* the output file name is set */
             arguments->output_file_name = arg;
+            break;
+
+        case 'c':
+            /* the colorkey is set */
+            arguments->colorkey = arg;
             break;
 
             /* we got a file name */
@@ -261,31 +268,47 @@ png_byte* next_byte(struct Image* image, int tileize) {
                 r += 8;
             }
         }
-
-        /* 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 x
-         * 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2
-         * 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2
-         * 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2
-         * 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2
-         * 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2
-         * 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2
-         * 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2
-         * 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5
-         * 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5
-         * 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5
-         * 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5
-         * 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5
-         * 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5
-         * 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5
-         * 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5 */
     }
 
     /* and return the pixel we found previously */
     return ptr;
 }
 
+unsigned short hex24_to_15(char* hex24) {
+    /* skip the # sign */
+    hex24++;
+
+    /* break off the pieces */
+    char rs[3], gs[3], bs[3];
+    rs[0] = *hex24++;
+    rs[1] = *hex24++;
+    rs[2] = '\0';
+    gs[0] = *hex24++;
+    gs[1] = *hex24++;
+    gs[2] = '\0';
+    bs[0] = *hex24++;
+    bs[1] = *hex24++;
+    bs[2] = '\0';
+
+    /* convert from hex string to int */
+    int r = strtol(rs, NULL, 16);
+    int g = strtol(gs, NULL, 16);
+    int b = strtol(bs, NULL, 16);
+
+    printf("r = %d, g = %d, b = %d\n", r, g, b);
+
+    /* build the full 15 bit short */
+    unsigned short color = (b >> 3) << 10;
+    color += (g >> 3) << 5;
+    color += (r >> 3);
+
+    return color;
+}
+
 /* perform the actual conversion from png to gba formats */
-void png2gba(FILE* in, FILE* out, char* name, int palette, int tileize) {
+void png2gba(FILE* in, FILE* out, char* name, int palette,
+        int tileize, char* colorkey) {
+
     /* load the image */
     struct Image* image = read_png(in);
 
@@ -301,11 +324,16 @@ void png2gba(FILE* in, FILE* out, char* name, int palette, int tileize) {
 
     /* the palette stores up to PALETTE_SIZE colors */
     unsigned short color_palette[PALETTE_SIZE];
-    /* palette sub 0 is reserved for black color */
+
+    /* palette sub 0 is reserved for transparent color */
     unsigned char palette_size = 1;
 
     /* clear the palette */
     memset(color_palette, 0, PALETTE_SIZE * sizeof(unsigned short));
+
+    /* insert the transparent color */
+    unsigned short ckey = hex24_to_15(colorkey);
+    color_palette[0] = ckey; 
 
     /* loop through the pixel data */
     unsigned char red, green, blue;
@@ -384,6 +412,7 @@ int main(int argc, char** argv) {
     /* the default values */
     args.output_file_name = NULL;
     args.input_file_name = NULL;
+    args.colorkey = "#ff00ff";
     args.palette = 0;
     args.tileize = 0;
 
@@ -415,7 +444,7 @@ int main(int argc, char** argv) {
     }
 
     /* do the conversion on these files */
-    png2gba(input, output, name, args.palette, args.tileize);
+    png2gba(input, output, name, args.palette, args.tileize, args.colorkey);
 
     return 0;
 }
