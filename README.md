@@ -7,4 +7,9 @@ raw images (the default) or 8-bit palletized images (with the -p option).
 
 Requires a C compiler and the libpng development library.
 
+# To compile on Ubuntu Linux:
+1. sudo apt-get install clang libpng-dev
+2. make
+
+
 
