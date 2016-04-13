@@ -9,12 +9,7 @@ by tile as when using a tile mode.
 
 Requires a C compiler and the libpng development library.
 
-<<<<<<< HEAD
+
 # To compile on Ubuntu Linux:
-1. sudo apt-get install clang libpng-dev
+1. sudo apt-get install clang libpng-dev exuberant-ctags
 2. make
-
-
-
-=======
->>>>>>> 3161ebc619d9b985dbe7f80957df047829527e33
