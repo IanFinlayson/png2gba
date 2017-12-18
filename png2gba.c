@@ -428,9 +428,15 @@ int main(int argc, char** argv) {
 
     /* set output file if name given */
     FILE* output;
+    char* output_name;
+
     /* if none specified use input name with .h */
-    char output_name[sizeof(char) * (strlen(name) + 3)];
-    sprintf(output_name, "%s.h", name);
+    if (args.output_file_name) {
+        output_name = args.output_file_name;
+    } else {
+        output_name = malloc(sizeof(char) * (strlen(name) + 3));
+        sprintf(output_name, "%s.h", name);
+    }
     output = fopen(output_name, "w");
 
     /* set input file to what was passed in */
