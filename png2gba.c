@@ -63,6 +63,7 @@ error_t parse_opt (int key, char* arg, struct argp_state* state) {
         case 't':
             /* set the tileize option */
             arguments->tileize = 1;
+            break;
 
         case 'o':
             /* the output file name is set */
