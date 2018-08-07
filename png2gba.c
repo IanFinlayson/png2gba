@@ -171,7 +171,6 @@ struct Image* read_png(FILE* in) {
     if (png_get_color_type(png_reader, png_info) == PNG_COLOR_TYPE_RGB) {
         image->channels = 3;
     } else if (png_get_color_type(png_reader,png_info)==PNG_COLOR_TYPE_RGBA) {
-        fprintf(stderr, "Warning: PNG alpha channel is ignored!\n");
         image->channels = 4;
     } else {
         fprintf(stderr, "Error: PNG file is not in the RGB or RGBA format!\n");
@@ -429,9 +428,15 @@ int main(int argc, char** argv) {
 
     /* set output file if name given */
     FILE* output;
+    char* output_name;
+
     /* if none specified use input name with .h */
-    char output_name[sizeof(char) * (strlen(name) + 3)];
-    sprintf(output_name, "%s.h", name);
+    if (args.output_file_name) {
+        output_name = args.output_file_name;
+    } else {
+        output_name = malloc(sizeof(char) * (strlen(name) + 3));
+        sprintf(output_name, "%s.h", name);
+    }
     output = fopen(output_name, "w");
 
     /* set input file to what was passed in */
