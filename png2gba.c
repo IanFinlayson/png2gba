@@ -25,7 +25,7 @@
 
 /* the info for the command line parameters */
 const char* argp_program_version = "png2gba 1.0";
-const char* argp_program_bug_address = "<finlayson@umw.edu>";
+const char* argp_program_bug_address = "<ifinlay@umw.edu>";
 const char doc [] = "PNG to GBA image conversion utility";
 const char args_doc[] = "FILE";
 
@@ -63,6 +63,7 @@ error_t parse_opt (int key, char* arg, struct argp_state* state) {
         case 't':
             /* set the tileize option */
             arguments->tileize = 1;
+            break;
 
         case 'o':
             /* the output file name is set */

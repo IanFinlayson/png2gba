@@ -1,6 +1,6 @@
 # Makefile
 
-CC=clang
+CC=gcc
 FLAGS=-g -W -Wall
 TARGET=png2gba
  
