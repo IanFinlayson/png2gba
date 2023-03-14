@@ -10,7 +10,7 @@ by tile as when using a tile mode.
 Requires a C compiler and dependencies: libpng, argp.
 
 # To compile on Ubuntu Linux:
-1. Install libpng: `sudo apt-get install clang libpng-dev exuberant-ctags`
+1. Install libpng: `sudo apt install clang libpng-dev exuberant-ctags`
 2. `make`
 
 argp doesn't need to be installed on Linux.
