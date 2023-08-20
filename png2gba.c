@@ -451,14 +451,17 @@ int main(int argc, char** argv) {
         }
         *extension = '\0';
 
+        char *file_operand_option = "w";;
         /* if none specified use input name with .h */
         if (args.output_file_name) {
             output_name = args.output_file_name;
+            if(i > command_offset){
+                file_operand_option = "a";
+            }
         } else {
             output_name = malloc(sizeof(char) * (strlen(name) + 3));
             sprintf(output_name, "%s.h", name);
         }
-
         /* set input file to what was passed in */
         input = fopen(argv[i], "rb");
         if (!input) {
@@ -466,7 +469,7 @@ int main(int argc, char** argv) {
                     args.input_file_name);
             return -1;
         }
-        output = fopen(output_name, "w");
+        output = fopen(output_name, file_operand_option);
         /* do the conversion on these files */
         png2gba(input, output, name, args.palette, args.tileize, args.colorkey);
         /* close up, we're done */
