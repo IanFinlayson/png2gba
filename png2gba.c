@@ -77,7 +77,9 @@ error_t parse_opt (int key, char* arg, struct argp_state* state) {
 
             /* we got a file name */
         case ARGP_KEY_ARG:
-            if (state->arg_num > 1) {
+            //Disabled the error check since batch processing allows multiple files as input
+            //argc counts the amount of parameters given and can normally never be exceeded
+            if (state->arg_num > (uint)state->argc) {
                 /* too many arguments */
                 fprintf(stderr, "Error: Only one file name can be given!\n");
                 argp_usage(state);
@@ -225,6 +227,11 @@ png_byte* next_byte(struct Image* image, int tileize) {
 
     /* if we have gone through it all */
     if (r == image->h) {
+        //Reset all parameters to reuse them
+        r = 0;
+        c = 0;
+        tr = 0;
+        tc = 0;
         return NULL;
     }
 
@@ -404,8 +411,6 @@ void png2gba(FILE* in, FILE* out, char* name, int palette,
         fprintf(out, "\n};\n\n");
     }
 
-    /* close up, we're done */
-    fclose(out);
 }
 
 
@@ -423,38 +428,53 @@ int main(int argc, char** argv) {
     /* parse command line */
     argp_parse(&info, argc, argv, 0, 0, &args);
 
-    /* the image name without the extension */
-    char* name = strdup(args.input_file_name);
-    char* extension = strstr(name, ".png");
-    if (!extension) {
-        fprintf(stderr, "Error: File name should end in .png!\n");
-        exit(-1);
-    }
-    *extension = '\0';
+    //The count parameters used, command-program itself takes up one space so start counting starting from 1
+    //Some parameters take two spaces, one for the option and another for the option input
+    int command_offset = 1 + args.palette + args.tileize + (strcmp(args.colorkey, "#ff00ff") != 0) + ((args.output_file_name != NULL)*2);
 
     /* set output file if name given */
     FILE* output;
     char* output_name;
+    //Initialize name with a value as a fall back option
+    char* name = strdup(args.input_file_name);
 
-    /* if none specified use input name with .h */
-    if (args.output_file_name) {
-        output_name = args.output_file_name;
-    } else {
-        output_name = malloc(sizeof(char) * (strlen(name) + 3));
-        sprintf(output_name, "%s.h", name);
+    FILE* input;
+
+    for(int i=command_offset;i<argc;i++){
+        //Copy the first argument of the regex given to the commandline
+        strcpy(name, argv[i]);
+        /* the image name without the extension */
+        char* extension = strstr(name, ".png");
+        if (!extension) {
+            fprintf(stderr, "Error: File name should end in .png!\n");
+            exit(-1);
+        }
+        *extension = '\0';
+
+        char *file_operand_option = "w";;
+        /* if none specified use input name with .h */
+        if (args.output_file_name) {
+            output_name = args.output_file_name;
+            if(i > command_offset){
+                file_operand_option = "a";
+            }
+        } else {
+            output_name = malloc(sizeof(char) * (strlen(name) + 3));
+            sprintf(output_name, "%s.h", name);
+        }
+        /* set input file to what was passed in */
+        input = fopen(argv[i], "rb");
+        if (!input) {
+            fprintf(stderr, "Error: Can not open %s for reading!\n",
+                    args.input_file_name);
+            return -1;
+        }
+        output = fopen(output_name, file_operand_option);
+        /* do the conversion on these files */
+        png2gba(input, output, name, args.palette, args.tileize, args.colorkey);
+        /* close up, we're done */
+        fclose(output);
     }
-    output = fopen(output_name, "w");
-
-    /* set input file to what was passed in */
-    FILE* input = fopen(args.input_file_name, "rb");
-    if (!input) {
-        fprintf(stderr, "Error: Can not open %s for reading!\n",
-                args.input_file_name);
-        return -1;
-    }
-
-    /* do the conversion on these files */
-    png2gba(input, output, name, args.palette, args.tileize, args.colorkey);
 
     return 0;
 }
