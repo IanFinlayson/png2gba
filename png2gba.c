@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <argp.h>
-#include <ctype.h>
 
 #define PNG_DEBUG 3
 #include <png.h>
